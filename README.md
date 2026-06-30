@@ -1,6 +1,20 @@
 # everything_ai_develop
 
 A comprehensive breakdown of the core architectural skills, behaviors, and guardrails driving our autonomous engineering agents.
+                                       ┌──────────────────────────────────────┐
+                                       │         Developer Application        │
+                                       └──────────────────┬───────────────────┘
+                                                          │ Uses SDK / API
+                                                          ▼
+                         ┌─────────────────────────────────────────────────────────────────────────┐
+                         │                       everything-ai-develop Core                        │
+                         ├───────────────┬───────────────────┬───────────────────┬─────────────────┤
+                         │  🧠 The Brain │   ✍️ The Hands     │    👁️ The Eyes     │  🛡️ The Shield  │
+                         │ (Context/AST) │ (Code Gen/Shell)  │ (Sandbox/Runtime) │ (Guardrails/PII)│
+                         └───────┬───────┴─────────┬─────────┴─────────┬─────────┴────────┬────────┘
+                                 │                 │                   │                  │
+                                 ▼                 ▼                   ▼                  ▼
+                          [Vector DB / Git]  [LSP / Terminal]  [Docker / E2B SDK]  [AgentShield/LLM]
 
 ---
 
