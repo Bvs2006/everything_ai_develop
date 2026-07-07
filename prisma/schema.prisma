@@ -1,0 +1,429 @@
+// ──────────────────────────────────────────────────────────────────────────
+// Everything AI Develop — Prisma Schema
+// Covers: platform catalog (frameworks/SDKs/tools/templates/articles)
+//         + auth + community (profiles/discussions/projects/groups/gamification)
+// Designed so future modules (MCP Hub, Playground, News Aggregator, etc.)
+// can add models/relations without restructuring existing tables.
+// ──────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ───────────────────────────────────────────────────────────────
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum Pricing {
+  FREE
+  FREEMIUM
+  PAID
+}
+
+enum ToolCategory {
+  IDE
+  CODING_ASSISTANT
+  MODELS
+  APIS
+  OCR
+  DEPLOYMENT
+  DATABASE
+  VECTOR_DATABASE
+  MONITORING
+  HOSTING
+}
+
+enum TemplateCategory {
+  AI_CHATBOT
+  RAG_APPLICATION
+  AI_AGENT
+  AI_WORKFLOW
+  DOCUMENT_CHAT
+  CODE_ASSISTANT
+}
+
+enum DiscussionCategory {
+  AI_ENGINEERING
+  LLMS
+  AGENTS
+  RAG
+  MCP
+  MACHINE_LEARNING
+  DEEP_LEARNING
+  AI_TOOLS
+  FRAMEWORKS
+  PROJECTS
+  CAREER
+}
+
+enum ProjectCategory {
+  AI_AGENTS
+  RAG_APPS
+  AUTOMATION
+  COMPUTER_VISION
+  NLP
+  RESEARCH_PROJECTS
+}
+
+enum UserLevel {
+  BEGINNER
+  AI_EXPLORER
+  AI_BUILDER
+  AI_ENGINEER
+  AI_EXPERT
+}
+
+enum LikeTargetType {
+  DISCUSSION
+  COMMENT
+  PROJECT
+  ARTICLE
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+// ── Auth.js required models ────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ── User & Profile ──────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+
+  profile       UserProfile?
+  bookmarks     Bookmark[]
+  discussions   Discussion[]
+  comments      Comment[]
+  projects      Project[]
+  articles      Article[]
+  groupMembers  GroupMember[]
+  likes         Like[]
+  notifications Notification[] @relation("NotificationRecipient")
+  viewedPages   ViewedPage[]
+}
+
+model UserProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  username    String    @unique
+  bio         String?   @db.Text
+  skills      String[]  @default([])
+  interests   String[]  @default([])
+  githubUrl   String?
+  linkedinUrl String?
+  points      Int       @default(0)
+  level       UserLevel @default(BEGINNER)
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Bookmark {
+  id         String   @id @default(cuid())
+  userId     String
+  targetType String // "framework" | "sdk" | "tool" | "article" | "template" | "project" | "discussion"
+  targetId   String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+}
+
+model ViewedPage {
+  id     String   @id @default(cuid())
+  userId String
+  path   String
+  viewedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt])
+}
+
+// ── Shared taxonomy ─────────────────────────────────────────────────────
+
+model Category {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  frameworks Framework[]
+  sdks       Sdk[]
+}
+
+model Tag {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  frameworks  Framework[]  @relation("FrameworkTags")
+  sdks        Sdk[]        @relation("SdkTags")
+  tools       Tool[]       @relation("ToolTags")
+  articles    Article[]    @relation("ArticleTags")
+  discussions Discussion[] @relation("DiscussionTags")
+}
+
+// ── Platform catalog ────────────────────────────────────────────────────
+
+model Framework {
+  id           String     @id @default(cuid())
+  name         String
+  slug         String     @unique
+  logoUrl      String?
+  description  String     @db.Text
+  language     String? // primary language, used for filtering
+  difficulty   Difficulty @default(INTERMEDIATE)
+  docsUrl      String?
+  githubUrl    String?
+  stars        Int        @default(0) // used for "popularity" filter/sort
+  categoryId   String?
+  category     Category?  @relation(fields: [categoryId], references: [id])
+  tags         Tag[]      @relation("FrameworkTags")
+  published    Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([slug])
+}
+
+model Sdk {
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  logoUrl       String?
+  overview      String    @db.Text
+  installation  String    @db.Text // markdown/code snippet
+  features      String[]  @default([])
+  exampleCode   String    @db.Text
+  docsUrl       String?
+  githubUrl     String?
+  language      String?
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id])
+  tags          Tag[]     @relation("SdkTags")
+  published     Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([slug])
+}
+
+model Tool {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  logoUrl     String?
+  description String       @db.Text
+  category    ToolCategory
+  pricing     Pricing      @default(FREE)
+  website     String?
+  tags        Tag[]        @relation("ToolTags")
+  published   Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([slug])
+  @@index([category])
+}
+
+model Template {
+  id                String           @id @default(cuid())
+  name              String
+  slug              String           @unique
+  category          TemplateCategory
+  description       String           @db.Text
+  folderStructure    String           @db.Text // rendered as a code tree
+  recommendedStack  String[]         @default([])
+  diagramPlaceholder String?         // path/url to placeholder diagram asset
+  githubUrl         String?
+  published         Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([slug])
+}
+
+model Article {
+  id            String   @id @default(cuid())
+  title         String
+  slug          String   @unique
+  excerpt       String?
+  contentMdx    String   @db.Text
+  coverImage    String?
+  authorId      String?
+  author        User?    @relation(fields: [authorId], references: [id])
+  category      String?
+  tags          Tag[]    @relation("ArticleTags")
+  readingTimeMin Int     @default(1)
+  published     Boolean  @default(true)
+  publishedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([slug])
+}
+
+// ── Community: Discussions ──────────────────────────────────────────────
+
+model Discussion {
+  id        String             @id @default(cuid())
+  title     String
+  content   String             @db.Text
+  authorId  String
+  author    User               @relation(fields: [authorId], references: [id])
+  category  DiscussionCategory
+  tags      Tag[]              @relation("DiscussionTags")
+  images    String[]           @default([])
+  links     String[]           @default([])
+  pinned    Boolean            @default(false)
+  reported  Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  comments Comment[]
+
+  @@index([category])
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  discussionId String
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id])
+  content      String   @db.Text
+  isAnswer     Boolean  @default(false) // marks a "helpful answer"
+  createdAt    DateTime @default(now())
+}
+
+// ── Community: Projects (Showcase) ──────────────────────────────────────
+
+model Project {
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  description String          @db.Text
+  techStack   String[]        @default([])
+  githubUrl   String?
+  demoUrl     String?
+  screenshots String[]        @default([])
+  category    ProjectCategory
+  authorId    String
+  author      User            @relation(fields: [authorId], references: [id])
+  createdAt   DateTime        @default(now())
+
+  @@index([category])
+}
+
+// ── Community: Groups ────────────────────────────────────────────────────
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String   @db.Text
+  category    String
+  createdAt   DateTime @default(now())
+
+  members GroupMember[]
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  userId   String
+  groupId  String
+  joinedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+// ── Community: Likes & Notifications ────────────────────────────────────
+
+// NOTE: Like is a polymorphic association (targetId can point at a Discussion,
+// Comment, or Project). Prisma can't express a scalar FK that targets three
+// different tables at once, so targetId is intentionally left un-related at
+// the DB level and resolved in the application layer (see src/lib/likes.ts).
+model Like {
+  id        String         @id @default(cuid())
+  userId    String
+  type      LikeTargetType
+  targetId  String
+  createdAt DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, targetId])
+  @@index([type, targetId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
