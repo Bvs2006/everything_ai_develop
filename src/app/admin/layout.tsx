@@ -12,7 +12,6 @@ const SECTIONS = [
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  // @ts-expect-error role is augmented in src/lib/auth.ts session callback
   if (!session?.user || session.user.role !== "ADMIN") {
     redirect("/auth/signin?callbackUrl=/admin");
   }
